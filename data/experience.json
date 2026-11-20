@@ -1,0 +1,14 @@
+{
+    "Index Review": {
+        "success": 10,
+        "failure": 2
+    },
+    "Pool Analysis": {
+        "success": 8,
+        "failure": 4
+    },
+    "Capacity Review": {
+        "success": 7,
+        "failure": 5
+    }
+}
