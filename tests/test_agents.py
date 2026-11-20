@@ -91,3 +91,13 @@ def test_evidence_checker():
            {"tool": "get_index_metadata", "output": '{"rows_examined": 4800000}'}]
     res = check_evidence(["latency is 1200 ms", "4,800,000 rows examined", "CPU is 99%"], log)
     assert res["unverified"] == ["CPU is 99%"] and res["enough_tools"]
+
+
+def test_llm_guardrail_relabels_schema_changes():
+    from agents.llmagent import GUARD_PREFIX, guard_steps
+    steps, flagged = guard_steps(["Create an index on the `filtered_column` to optimize the query.",
+                                  "Propose an index on customer_id for DBA review",
+                                  "Check pool wait time"])
+    assert flagged == ["Create an index on the `filtered_column` to optimize the query."]
+    assert steps[0].startswith(GUARD_PREFIX) and steps[1:] == ["Propose an index on customer_id for DBA review",
+                                                               "Check pool wait time"]

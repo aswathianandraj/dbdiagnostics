@@ -95,6 +95,23 @@ def check_evidence(evidence, tool_log):
             "enough_tools": len(tools_used) >= 2}
 
 
+_SCHEMA_CHANGE = re.compile(r"\b(create|alter|drop|add)\b[^.]*\b(index|table|column|constraint)\b", re.I)
+_REVIEW_WORDS = re.compile(r"\b(review|staging|propose|proposal|dba|test)\b", re.I)
+GUARD_PREFIX = "Propose for DBA review and test in staging first (not executed): "
+
+
+def guard_steps(steps):
+    """Safety guardrail: the brief forbids executing schema changes. If the LLM recommends one
+    without review/staging wording, relabel it as advisory instead of passing it on as an order."""
+    out, flagged = [], []
+    for s in steps:
+        if _SCHEMA_CHANGE.search(s) and not _REVIEW_WORDS.search(s):
+            flagged.append(s)
+            s = GUARD_PREFIX + s
+        out.append(s)
+    return out, flagged
+
+
 class llmagent:
 
     def __init__(self, model=MODEL):
@@ -148,11 +165,14 @@ class llmagent:
         confidence = diagnosis.confidence
         if check["unverified"] or not check["enough_tools"]:
             confidence = min(confidence, 0.4)  # don't trust what we could not verify
+        steps, flagged = guard_steps(diagnosis.recommended_steps)
+        guard_note = f" Guardrail relabelled {len(flagged)} schema-change step(s) as review-only." if flagged else ""
         return make_result(
             "LLM Agent", scenario, diagnosis.bottleneck, diagnosis.evidence,
-            diagnosis.recommended_steps, diagnosis.verification_metric,
+            steps, diagnosis.verification_metric,
             f"Qwen3 called {len(tool_log)} tool(s) ({', '.join(check['tools_used']) or 'none'}). "
-            f"Evidence check: {len(check['verified'])} verified, {len(check['unverified'])} unverified.",
+            f"Evidence check: {len(check['verified'])} verified, {len(check['unverified'])} unverified.{guard_note}",
             confidence,
-            {"evidence_check": check, "tool_log": tool_log, "symptom_summary_llm": diagnosis.symptom_summary},
+            {"evidence_check": check, "guardrail_flagged_steps": flagged, "tool_log": tool_log,
+             "symptom_summary_llm": diagnosis.symptom_summary},
         )
