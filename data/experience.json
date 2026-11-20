@@ -1,14 +1,52 @@
 {
-    "Index Review": {
-        "success": 10,
-        "failure": 2
+    "Missing index / full table scan": {
+        "Index Review": {
+            "success": 10,
+            "failure": 2
+        },
+        "Query Plan Check": {
+            "success": 2,
+            "failure": 2
+        }
     },
-    "Pool Analysis": {
-        "success": 8,
-        "failure": 4
+    "Connection pool saturation": {
+        "Pool Analysis": {
+            "success": 8,
+            "failure": 4
+        },
+        "Fix Connection Leak": {
+            "success": 5,
+            "failure": 1
+        },
+        "Raise Pool Size": {
+            "success": 2,
+            "failure": 3
+        }
     },
-    "Capacity Review": {
-        "success": 7,
-        "failure": 5
+    "Peak load / capacity": {
+        "Capacity Review": {
+            "success": 7,
+            "failure": 5
+        },
+        "Cache Hot Reads": {
+            "success": 4,
+            "failure": 2
+        },
+        "Read Replica": {
+            "success": 1,
+            "failure": 1
+        }
+    },
+    "Healthy": {
+        "Keep Monitoring": {
+            "success": 5,
+            "failure": 0
+        }
+    },
+    "Insufficient evidence": {
+        "Collect More Data": {
+            "success": 3,
+            "failure": 0
+        }
     }
 }
