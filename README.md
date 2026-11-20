@@ -69,7 +69,7 @@ Each scenario also has a short `history` of metric windows (used by the model-ba
 | **Goal-Based** | Goal: latency ≤ SLA, safe actions only, cause confirmed first. **Breadth-first search** over actions with preconditions (optimise only after a diagnostic) and effects (predicted latency). Returns the shortest plan, e.g. A: Query Plan Check → Index Review (1200 → 160 ms). |
 | **Utility-Based** | Scores every action: EU = P(cause \| evidence) × benefit − 0.05·cost − 0.5·risk − 10 if unsafe. Picks the maximum; the full table is shown in the UI. |
 | **Learning** | Picks the action with the best Laplace-smoothed success rate (s+1)/(n+2) from `experience.json`, explores 10% of the time, then records the (simulated) outcome, so history changes the next decision. |
-| **LLM** | Qwen3 on Ollama **via LangChain** (`ChatOllama.bind_tools`). The model calls the 4 tools itself (at least 2 are enforced), and the answer is forced into a Pydantic schema. **Evidence check:** every number it cites must appear in a tool output, otherwise confidence is capped at 0.4. |
+| **LLM** | Qwen3 on Ollama **via LangChain** (`ChatOllama.bind_tools`). The model calls the 4 tools itself (at least 2 are enforced), and the answer is forced into a Pydantic schema. **Evidence check:** every number it cites must appear in a tool output, otherwise confidence is capped at 0.4. **Guardrail:** any step that would create/alter/drop schema without review wording is relabelled "Propose for DBA review and test in staging first (not executed)". |
 
 ## Installation
 
@@ -104,7 +104,7 @@ python -m streamlit run app.py
 pytest -v
 ```
 
-63 tests: every classical agent × every scenario (correct bottleneck, all five output parts, never recommends a schema change on production; the edge case must not be answered with high confidence), plus mechanism tests (model-based uses history, goal plan confirms before fixing, unsafe action loses on utility, learning updates history) and the LLM evidence checker.
+64 tests: every classical agent × every scenario (correct bottleneck, all five output parts, never recommends a schema change on production; the edge case must not be answered with high confidence), plus mechanism tests (model-based uses history, goal plan confirms before fixing, unsafe action loses on utility, learning updates history) the LLM evidence checker and the LLM schema-change guardrail.
 
 ## Comparison: why decisions differ
 
