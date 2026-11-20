@@ -1,7 +1,9 @@
+import json
+
 import pandas as pd
 import streamlit as st
 
-from data.scenarios import SCENARIOS
+from data.scenarios import SCENARIOS, agent_view
 
 from agents.reflexagent import reflexagent
 from agents.modelbasedagent import modelbasedagent
@@ -11,14 +13,16 @@ from agents.learningagent import learningagent
 from agents.llmagent import llmagent
 
 st.set_page_config(
-   page_title="Database Diagnosis Assistant",
+    page_title="Database Diagnosis Assistant",
     layout="wide"
 )
 
 st.title("Database Performance Diagnosis Assistant")
-st.markdown( """
+st.markdown(
+    """
     Compare how different AI agent architectures diagnose
     the same database performance problem.
+    All recommendations are advisory: **no schema changes are executed**.
     """
 )
 
@@ -30,10 +34,12 @@ st.divider()
 
 scenario_name = st.selectbox(
     "Select Scenario",
-    list(SCENARIOS.keys())
+    list(SCENARIOS.keys()),
+    format_func=lambda k: f"{k}: {SCENARIOS[k]['name']}"
 )
 
 scenario = SCENARIOS[scenario_name]
+view = agent_view(scenario)  # the answer key is never shown to agents
 
 # ----------------------------
 # SCENARIO DETAILS
@@ -46,7 +52,8 @@ c1, c2, c3 = st.columns(3)
 with c1:
     st.metric(
         "Latency (ms)",
-        scenario["query_latency_ms"]
+        scenario["query_latency_ms"],
+        help=f"SLA {scenario['expected_sla_ms']} ms"
     )
 
     st.metric(
@@ -76,56 +83,65 @@ with c3:
         scenario["waiting_requests"]
     )
 
-with st.expander("View Complete Scenario Data"):
+with st.expander("View Complete Scenario Data (identical input for all agents)"):
 
-    st.json(scenario)
+    st.json(view)
 
 st.divider()
+
+use_llm = st.checkbox("Include LLM agent (needs Ollama running with qwen3)", value=True)
 
 # ----------------------------
 # RUN AGENTS
 # ----------------------------
 
-if st.button("Run All Agents", use_container_width=True):
+if st.button("Run All Agents", width="stretch"):
 
     agents = [
         reflexagent(),
         modelbasedagent(),
         goalbasedagent(),
         utilitybasedagent(),
-        learningagent(),
-        llmagent()
+        learningagent()
     ]
+
+    if use_llm:
+        agents.append(llmagent())
 
     results = []
 
-    for agent in agents:
+    with st.spinner("Agents are diagnosing..."):
 
-        result = agent.diagnose(scenario)
+        for agent in agents:
 
-        results.append(result)
+            result = agent.diagnose(view)
+
+            results.append(result)
 
     # -----------------------------------
-    # AGENT CARDS
+    # AGENT CARDS (3 per row, so all six fit)
     # -----------------------------------
 
     st.subheader("Agent Diagnoses")
 
-    cols = st.columns(5)
+    for row_start in range(0, len(results), 3):
 
-    for col, result in zip(cols, results):
+        cols = st.columns(3)
 
-        with col:
+        for col, result in zip(cols, results[row_start:row_start + 3]):
 
-            st.info(result["agent"])
+            with col:
 
-            st.write(
-                f"**Bottleneck**\n\n{result['bottleneck']}"
-            )
+                st.info(result["agent"])
 
-            st.write(
-                f"**Recommendation**\n\n{result['recommendation']}"
-            )
+                st.write(
+                    f"**Bottleneck**\n\n{result['bottleneck']} "
+                    f"(confidence {result['confidence']:.2f})"
+                )
+
+                st.write(
+                    f"**Recommendation**\n\n{result['recommendation']}"
+                )
 
     st.divider()
 
@@ -135,29 +151,50 @@ if st.button("Run All Agents", use_container_width=True):
 
     st.subheader("Agent Comparison")
 
-    comparison_df = pd.DataFrame(results)
+    comparison_df = pd.DataFrame(results)[
+        ["agent", "bottleneck", "confidence", "recommendation", "verification_metric"]
+    ]
 
     st.dataframe(
         comparison_df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True
     )
+
+    found = {r["bottleneck"] for r in results}
+    if len(found) == 1:
+        st.success(f"All agents agree: **{found.pop()}**")
+    else:
+        st.warning("Agents disagree: " + ", ".join(sorted(found)) +
+                   ". See the reasoning below for why their mechanisms differ.")
 
     st.divider()
 
     # -----------------------------------
-    # SUMMARY
+    # SUMMARY (the 5 required outputs per agent)
     # -----------------------------------
 
     st.subheader("Decision Summary")
 
     for result in results:
 
-        st.markdown(
-            f"""
-            **{result['agent']}**
+        with st.expander(f"{result['agent']}: {result['bottleneck']}"):
 
-            - Bottleneck: {result['bottleneck']}
-            - Recommendation: {result['recommendation']}
-            """
-        )
+            st.markdown(
+                f"""
+                - **Symptom summary:** {result['symptom_summary']}
+                - **Evidence:** {result['evidence']}
+                - **Likely bottleneck:** {result['bottleneck']}
+                - **Recommended steps:** {result['recommendation']}
+                - **Verification metric:** {result['verification_metric']}
+                - **Reasoning:** {result['reasoning']}
+                """
+            )
+
+            if result["details"]:
+                st.markdown("**Agent internals** (state / plan / utility table / learning history / tool log):")
+                st.code(json.dumps(result["details"], indent=2, default=str), language="json")
+
+    with st.expander("Answer key (for testing only; never passed to agents)"):
+
+        st.write(scenario["expected_bottleneck"])
