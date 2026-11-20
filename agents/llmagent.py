@@ -11,6 +11,7 @@ How it works:
 Safety: tools are read-only, and the system prompt forbids executing schema changes.
 """
 import json
+import os
 import re
 from typing import Literal
 
@@ -19,7 +20,7 @@ from pydantic import BaseModel, Field
 from agents.common import BOTTLENECKS, UNKNOWN, make_result
 from tools import diagnostic_tools as dt
 
-MODEL = "qwen3"
+MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")  # e.g. OLLAMA_MODEL=qwen3:1.7b for a faster CPU run
 MAX_STEPS = 6
 
 SYSTEM_PROMPT = f"""You are a database performance diagnosis assistant.
@@ -105,7 +106,8 @@ class llmagent:
 
         tools = build_tools(scenario)
         by_name = {t.name: t for t in tools}
-        llm = ChatOllama(model=self.model, temperature=0)
+        # reasoning=False turns off Qwen3's long <think> phase, which is very slow on a CPU
+        llm = ChatOllama(model=self.model, temperature=0, reasoning=False)
         llm_tools = llm.bind_tools(tools)
 
         messages = [SystemMessage(SYSTEM_PROMPT),
