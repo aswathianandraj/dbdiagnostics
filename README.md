@@ -29,7 +29,7 @@ Agents recommend safe diagnostics and optimizations without performing schema ch
 
 dbdiagnostics/
 ├── app.py
-├── classicalagents/
+├── agents/
 ├── llmagents/
 ├── tools/
 ├── data/
